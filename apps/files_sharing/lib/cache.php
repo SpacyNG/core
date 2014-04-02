@@ -45,7 +45,10 @@ class Shared_Cache extends Cache {
 	 * @return \OC\Files\Cache\Cache
 	 */
 	private function getSourceCache($target) {
-		$source = \OC_Share_Backend_File::getSource($target);
+		if ($target === false) {
+			$target = '';
+		}
+		$source = \OC_Share_Backend_File::getSource($target, $this->storage->getMountPoint(), $this->storage->getShareType());
 		if (isset($source['path']) && isset($source['fileOwner'])) {
 			\OC\Files\Filesystem::initMountPoints($source['fileOwner']);
 			$mount = \OC\Files\Filesystem::getMountByNumericId($source['storage']);
@@ -126,28 +129,24 @@ class Shared_Cache extends Cache {
 	 * @return array
 	 */
 	public function getFolderContents($folder) {
-		if ($folder == '') {
-			$files = \OCP\Share::getItemsSharedWith('file', \OC_Share_Backend_File::FORMAT_GET_FOLDER_CONTENTS);
-			foreach ($files as &$file) {
-				$file['mimetype'] = $this->getMimetype($file['mimetype']);
-				$file['mimepart'] = $this->getMimetype($file['mimepart']);
-				$file['usersPath'] = 'files/Shared/' . ltrim($file['path'], '/');
-			}
-			return $files;
-		} else {
-			$cache = $this->getSourceCache($folder);
-			if ($cache) {
-				$parent = $this->storage->getFile($folder);
-				$sourceFolderContent = $cache->getFolderContents($this->files[$folder]);
-				foreach ($sourceFolderContent as $key => $c) {
-					$sourceFolderContent[$key]['usersPath'] = 'files/Shared/' . $folder . '/' . $c['name'];
-					$sourceFolderContent[$key]['uid_owner'] = $parent['uid_owner'];
-					$sourceFolderContent[$key]['displayname_owner'] = $parent['uid_owner'];
-				}
 
-				return $sourceFolderContent;
-			}
+		if ($folder === false) {
+			$folder = '';
 		}
+
+		$cache = $this->getSourceCache($folder);
+		if ($cache) {
+			$parent = $this->storage->getFile($folder);
+			$sourceFolderContent = $cache->getFolderContents($this->files[$folder]);
+			foreach ($sourceFolderContent as $key => $c) {
+				$sourceFolderContent[$key]['usersPath'] = 'files/' . $folder . '/' . $c['name'];
+				$sourceFolderContent[$key]['uid_owner'] = $parent['uid_owner'];
+				$sourceFolderContent[$key]['displayname_owner'] = $parent['uid_owner'];
+			}
+
+			return $sourceFolderContent;
+		}
+
 		return false;
 	}
 
@@ -213,7 +212,7 @@ class Shared_Cache extends Cache {
 	 */
 	public function move($source, $target) {
 		if ($cache = $this->getSourceCache($source)) {
-			$file = \OC_Share_Backend_File::getSource($target);
+			$file = \OC_Share_Backend_File::getSource($target, $this->storage->getMountPoint(), $this->storage->getShareType());
 			if ($file && isset($file['path'])) {
 				$cache->move($this->files[$source], $file['path']);
 			}
